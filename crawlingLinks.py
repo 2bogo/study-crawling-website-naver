@@ -7,40 +7,41 @@ import time
 import pickle
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
 
-options = webdriver.ChromeOptions()
-options.add_argument("headless")
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
+def date_range(start, end):
+    start = datetime.strptime(start, "%Y-%m-%d")
+    end = datetime.strptime(end, "%Y-%m-%d")
+    dates = [(start + timedelta(days=i)).strftime("%Y.%m.%d") for i in range((end-start).days+1)]
+    return dates
 
-driver = webdriver.Chrome('/home/ezy/Downloads/chromedriver', options=options)
+def searchTotalLink(date):
+    lastLink = ""
+    totalLink = []
+    page = 1
+    joinedDate = ''.join(date.split('.'))
+    while True:
+        addr = f"https://search.naver.com/search.naver?where=news&sm=tab_pge&query=%EA%B2%BD%EB%82%A8&sort=0&photo=0&field=0&pd=3&ds={date}&de={date}&cluster_rank=21&mynews=0&office_type=0&office_section_code=0&news_office_checked=&nso=so:r,p:from{joinedDate}to{joinedDate},a:all&start={page}"
+        driver.get(addr)
+        time.sleep(1)
+        html = driver.page_source
+        dom = BeautifulSoup(html, "lxml")
+        try:
+            if "검색결과가 없습니다." in [x.text for x in dom.find_all("div", {"class" : "not_found02"})][0]:
+                break
+        except:
+            select_raw = dom.find_all("a", {"class" : "info"})
+            links = [selected.attrs['href'] for selected in select_raw]
 
-data = []
-lastLink = ""
-totalLinks = []
-page = 1
+            if lastLink == links[-1]:
+                break
+            else:
+                lastLink = links[-1]
 
-while True:
-    addr = f"https://search.naver.com/search.naver?where=news&sm=tab_pge&query=%EA%B2%BD%EB%82%A8&sort=0&photo=0&field=0&pd=5&ds=2020.07.17&de=2021.07.17&cluster_rank=32&mynews=0&office_type=0&office_section_code=0&news_office_checked=&nso=so:r,p:1y,a:all&start={page}"
-    driver.get(addr)
-    time.sleep(1)
-    html = driver.page_source
-    dom = BeautifulSoup(html, "lxml")
-    try:
-        if "검색결과가 없습니다." in [x.text for x in dom.find_all("div", {"class" : "not_found02"})][0]:
-            break
-    except:
-        select_raw = dom.find_all("a", {"class" : "info"})
-        links = [selected.attrs['href'] for selected in select_raw]
-        
-        if lastLink == links[-1]:
-            break
-        else:
-            lastLink = links[-1]
-                
-        naver_links = [x.split('mode=LSD')[0] + "m_view=1&includeAllCount=true&mode=LSD" + x.split('mode=LSD')[1] for x in links if 'naver' in x and 'mode=LSD' in x]
-        totalLinks += naver_links
-        page += 10
+            naver_links = [x.split('mode=LSD')[0] + "m_view=1&includeAllCount=true&mode=LSD" + x.split('mode=LSD')[1] for x in links if 'naver' in x and 'mode=LSD' in x]
+            totalLink += naver_links
+            page += 10
+    return totalLink
 
 def crawlingComments(addr):
     driver.get(addr)
@@ -73,6 +74,19 @@ def crawlingComments(addr):
     else:
         comments = [[title, comment.text, addr] for comment in comments_raw]
         return comments
+
+options = webdriver.ChromeOptions()
+options.add_argument("headless")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+
+driver = webdriver.Chrome('/home/ezy/Downloads/chromedriver', options=options)
+
+dates = date_range("2020-7-15", "2021-07-16")
+
+totalLinks = [searchTotalLink(x) for x in dates]
+
+totalLinks = sum(totalLinks, [])
 
 data = [crawlingComments(addr) for addr in totalLinks]
 
