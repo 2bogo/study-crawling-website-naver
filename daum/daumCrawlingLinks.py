@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from tqdm import tqdm
+import math
 
 def date_range(start, end):
     start = datetime.strptime(start, "%Y-%m-%d")
@@ -21,21 +22,26 @@ def searchTotalLink(date):
     totalLink = []
     page = 1
     joinedDate = ''.join(date.split('.'))
+    pageLimit = 2
     while True:
-        addr = f"https://search.daum.net/search?w=news&DA=STC&enc=utf8&cluster=y&cluster_page=1&q=%EA%B2%BD%EB%82%A8&period=u&sd={date}000000&ed={date}235959&p={page}"
-        driver.get(addr)
-        time.sleep(1)
-        html = driver.page_source
-        dom = BeautifulSoup(html, "lxml")
-        select_raw = dom.find_all("a", {"class" : "f_nb"})
-        links = [selected.attrs['href'] for selected in select_raw]
-
-        if lastLink == links[-1]:
+        if page > pageLimit:
             break
         else:
-            lastLink = links[-1]
+        
+            addr = f"https://search.daum.net/search?w=news&DA=STC&enc=utf8&cluster=y&cluster_page=1&q=%EA%B2%BD%EB%82%A8&period=u&sd={joinedDate}000000&ed={joinedDate}235959&p={page}"
+            driver.get(addr)
+            time.sleep(1)
+            html = driver.page_source
+            dom = BeautifulSoup(html, "lxml")
+            select_raw = dom.find_all("a", {"class" : "f_nb"})
+            links = [selected.attrs['href'] for selected in select_raw]
+
+            page_number = dom.find_all("span", {"id" : "resultCntArea"})
+            pageNumber = [num.text for num in page_number][0]
+            pageLimit = math.ceil(int(''.join(pageNumber.split(' ')[-1].split('건')[0].split(',')))/10)
             totalLink += links
             page += 1
+
     return totalLink
 
 def crawlingComments(addr):
@@ -80,7 +86,7 @@ options.add_argument("--disable-dev-shm-usage")
 
 driver = webdriver.Chrome('/home/ezy/Downloads/chromedriver', options=options)
 
-dates = date_range("2021-7-21", "2021-07-21")
+dates = date_range("2020-7-21", "2021-07-21")
 
 totalLinks = [searchTotalLink(x) for x in tqdm(dates)]
 
